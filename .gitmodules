@@ -1,0 +1,3 @@
+[submodule "flowfuse-original"]
+	path = flowfuse-original
+	url = https://github.com/FlowFuse/nr-assistant.git

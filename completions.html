@@ -227,7 +227,7 @@
                             suggestionXhr = predictResult[2] // the xhr reference is used to abort the request if needed
                             promise.then(result => {
                                 suggestionXhr = null // reset the xhr reference
-                                const suggestions = result.suggestions || []
+                                const suggestions = result?.suggestions || []
                                 if (!Array.isArray(suggestions) || suggestions.length === 0) {
                                     debug('No suggestions found in prediction result')
                                     return
@@ -297,7 +297,7 @@
                 })
             }
         }
-        RED.plugins.registerPlugin('ff-assistant-completions', plugin)
+        RED.plugins.registerPlugin('pi-assistant-completions', plugin)
 
         /**
          * Get the next predictions for the given flow and source node.
@@ -333,6 +333,8 @@
                 userContext: '' // FUTURE: include user textual input context for more personalized explanations
             }
 
+            console.log('[nr-assistant] predict_next request', { transactionId, sourceNode: sourceNode.type, flowLength: nodes?.length })
+
             const promise = new Promise((resolve, reject) => {
                 xhr = $.ajax({
                     url,
@@ -340,6 +342,7 @@
                     data,
                     timeout: assistantOptions.requestTimeout,
                     success: (reply, textStatus, jqXHR) => {
+                        console.log('[nr-assistant] predict_next response', { transactionId, reply })
                         // busyNotification.close()
                         if (reply?.error) {
                             debug('predictNext -> ajax -> error', reply.error)
@@ -349,17 +352,21 @@
                         try {
                             if (typeof reply.data !== 'object' || !reply.data) {
                                 debug('Invalid reply data', reply.data)
+                                console.log('[nr-assistant] predict_next invalid data', reply.data)
                                 return resolve(null)
                             }
                             const { result, ...replyData } = reply.data
                             if (!result || replyData.transactionId !== transactionId) {
                                 debug('Prediction transaction ID mismatch', result, transactionId)
+                                console.log('[nr-assistant] predict_next tx mismatch', { expected: transactionId, got: replyData.transactionId })
                                 return resolve(null)
                             }
                             if (!result || !result.structuredContent || !result.structuredContent.suggestions || Array.isArray(result.structuredContent.suggestions) === false || result.structuredContent.suggestions.length === 0) {
                                 debug('No result text in reply', reply.data)
-                                return resolve(null)
+                                console.log('[nr-assistant] predict_next no suggestions', result?.structuredContent?.suggestions)
+                                return resolve({ suggestions: [], sourceId: sourceNode.id, sourcePort })
                             }
+                            console.log('[nr-assistant] predict_next suggestions', result.structuredContent.suggestions)
                             return resolve(result.structuredContent)
                         } catch (error) {
                             console.warn('Error processing prediction response', error)

@@ -43,11 +43,11 @@ describe('settings', function () {
             result.completions.vocabularyUrl.should.equal('http://vocab')
         })
 
-        it('should set tables.enabled true if tables token exists', async function () {
+        it('should set tables.enabled false by default (tables are FlowFuse-only)', async function () {
             RED.settings.flowforge.tables = { token: 'abc' }
             RED.settings.flowforge.assistant = { enabled: true }
             const result = await settings.getSettings(RED)
-            result.tables.enabled.should.be.true()
+            result.tables.enabled.should.be.false()
         })
 
         it('should set mcp.enabled true by default', async function () {
@@ -57,10 +57,11 @@ describe('settings', function () {
             result.mcp.enabled.should.be.true()
         })
 
-        it('should not throw if flowforge or assistant is missing', async function () {
+        it('should default to enabled when flowforge or assistant is missing', async function () {
             RED = { settings: {} }
             const result = await settings.getSettings(RED)
-            result.enabled.should.be.false()
+            result.enabled.should.be.true() // defaults to enabled
+            result.backend.should.equal('flowfuse')
         })
     })
 })

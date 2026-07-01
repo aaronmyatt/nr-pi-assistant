@@ -64,7 +64,7 @@
 
         const plugin = {
             type: 'assistant',
-            name: 'Node-RED Assistant Plugin',
+            name: 'Node-RED AI Assistant',
             icon: 'font-awesome/fa-magic',
             onadd: async function () {
                 if (!window.FFAssistantUtils) {
@@ -109,7 +109,7 @@
                 })
             }
         }
-        RED.plugins.registerPlugin('flowfuse-nr-assistant', plugin)
+        RED.plugins.registerPlugin('pi-assistant', plugin)
 
         function createAssistantMenu () {
             const toolbarMenuButton = $('<li><a id="red-ui-header-button-ff-ai" class="button" href="#"></a></li>')
@@ -120,7 +120,7 @@
             } else {
                 toolbarMenuButton.prependTo('.red-ui-header-toolbar') // add the button leftmost of the toolbar
             }
-            RED.popover.tooltip(toolbarMenuButtonAnchor, nls('name'))
+            RED.popover.tooltip(toolbarMenuButtonAnchor, 'Node-RED AI Assistant')
 
             /* NOTE: For the menu entries icons' property...
                If `.icon` is a URL (e.g. resource/xxx/icon.svg), the RED.menu API will add it as an <img> tag.
@@ -131,44 +131,15 @@
             debug('Building FlowFuse Expert menu')
 
             const ffAssistantMenu = [
-                { id: 'ff-assistant-title', label: nls('name'), visible: true }, // header
+                { id: 'ff-assistant-title', label: 'Node-RED AI Assistant', visible: true }, // header
                 null // separator
             ]
             RED.menu.init({ id: 'red-ui-header-button-ff-ai', options: ffAssistantMenu })
         }
         function showLoginPrompt () {
-            $.ajax({
-                contentType: 'application/json',
-                url: 'nr-assistant/auth/start',
-                method: 'POST',
-                data: JSON.stringify({
-                    editorURL: window.location.origin + window.location.pathname
-                })
-            }).then(data => {
-                if (data && data.path && data.state) {
-                    const handleAuthCallback = function (evt) {
-                        debug('handleAuthCallback', evt)
-                        try {
-                            const message = JSON.parse(evt.data)
-                            if (message.code === 'flowfuse-auth-complete') {
-                                showNotification('Connected to FlowFuse', { type: 'success' })
-                                if (message.state === data.state) {
-                                    RED.menu.setVisible('ff-assistant-login', false)
-                                    RED.menu.setVisible('ff-assistant-function-builder', true)
-                                }
-                            } else if (message.code === 'flowfuse-auth-error') {
-                                showNotification('Failed to connect to FlowFuse', { type: 'error' })
-                                console.warn('Failed to connect to FlowFuse:', message.error)
-                            }
-                        } catch (err) {}
-                        window.removeEventListener('message', handleAuthCallback, false)
-                    }
-                    window.open(document.location.toString().replace(/[?#].*$/, '') + data.path, 'FlowFuseNodeREDPluginAuthWindow', 'menubar=no,location=no,toolbar=no,chrome,height=650,width=500')
-                    window.addEventListener('message', handleAuthCallback, false)
-                } else if (data && data.error) {
-                    RED.notify(`Failed to connect to server: ${data.error}`, { type: 'error' })
-                }
-            })
+            // FlowFuse login has been removed. The plugin is self-hosted with pi.
+            // Auth is handled via env vars (DEEPSEEK_API_KEY, etc.) in the Node-RED runtime.
+            RED.notify('This plugin uses local AI backends. Configure your API key in the Node-RED settings.', { type: 'info' })
         }
 
         function initAssistant (options) {
@@ -178,6 +149,8 @@
                 initialisedInterlock = true
                 createAssistantMenu()
                 if (assistantOptions.standalone) {
+                    // In standalone/self-hosted mode, show a connect button that explains
+                    // the plugin uses local AI backends (pi) with env-var API keys.
                     RED.menu.addItem('red-ui-header-button-ff-ai', {
                         id: 'ff-assistant-login',
                         label: `<span>${nls('login.menu.label')}</span>`,
@@ -1212,12 +1185,14 @@
                         xhr = null
                     }
                 })
+                console.log('[nr-assistant] doPrompt request', { method: promptOptions.method, transactionId, prompt })
                 xhr = $.ajax({
                     url: 'nr-assistant/' + (promptOptions.method || promptOptions.lang), // e.g. 'nr-assistant/json'
                     type: 'POST',
                     data,
                     success: function (reply, textStatus, jqXHR) {
                         debug('doPrompt -> ajax -> success', reply)
+                        console.log('[nr-assistant] doPrompt success', { method: promptOptions.method, transactionId, reply })
                         if (reply?.error) {
                             RED.notify(reply.error, 'error')
                             callback(new Error(reply.error), null)
@@ -1242,8 +1217,19 @@
                     complete: function () {
                         xhr = null
                         busyNotification.close()
+                        // Clean up streaming subscription
+                        if (typeof RED?.comms?.unsubscribe === 'function') {
+                            RED.comms.unsubscribe('nr-assistant/stream/' + transactionId)
+                        }
                     }
                 })
+
+                // ── Streaming: subscribe to token-by-token deltas ──
+                if (typeof RED?.comms?.subscribe === 'function') {
+                    RED.comms.subscribe('nr-assistant/stream/' + transactionId, function (topic, msg) {
+                        console.log('[nr-assistant] stream delta', { transactionId, delta: msg?.delta?.slice(0, 50) })
+                    })
+                }
             })
         }
 
@@ -1353,12 +1339,21 @@
                         data: body,
                         timeout: assistantOptions.requestTimeout,
                         success: (reply, textStatus, jqXHR) => {
-                            // console.log('showFunctionBuilderPrompt -> ajax -> success', reply)
                             busyNotification.close()
                             try {
-                                const flowJson = typeof reply?.data?.flow === 'string' ? JSON.parse(reply.data.flow) : reply?.data?.flow
-                                if (flowJson && Array.isArray(flowJson) && flowJson.length > 0) {
-                                    importFlow(flowJson)
+                                // pi backend returns { transactionId, data: { func, outputs, node_modules } }
+                                const funcData = reply?.data?.data
+                                if (funcData?.func) {
+                                    // Create a minimal function node — importFlow handles IDs and placement
+                                    const functionNode = {
+                                        type: 'function',
+                                        name: prompt || 'Generated Function',
+                                        func: funcData.func,
+                                        outputs: funcData.outputs || 1
+                                    }
+                                    // Use importFlow (same function the old code used) to place on canvas
+                                    const flowJson = [functionNode]
+                                    importFlow(flowJson, false)
                                 } else {
                                     processAIErrorResponse(jqXHR, textStatus, 'No data in response from server')
                                 }

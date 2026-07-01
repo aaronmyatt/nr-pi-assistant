@@ -1,7 +1,7 @@
 {
-    "name": "@flowfuse/nr-assistant",
+    "name": "node-red-contrib-pi-assistant",
     "version": "0.17.0",
-    "description": "FlowFuse Node-RED Expert plugin",
+    "description": "Node-RED AI Assistant plugin powered by pi (earendil-works/pi) — self-hosted, bring-your-own-key",
     "main": "index.js",
     "scripts": {
         "test": "mocha --exit \"test/**/*.test.js\"",
@@ -31,18 +31,19 @@
     "node-red": {
         "version": ">=2.2.0",
         "plugins": {
-            "flowfuse-nr-assistant": "index.js",
-            "ff-assistant-completions": "completions.html"
+            "pi-assistant": "index.js",
+            "pi-assistant-completions": "completions.html"
         }
     },
     "engines": {
         "node": ">=16.x"
     },
     "dependencies": {
+        "@earendil-works/pi-ai": "^0.80.3",
+        "@earendil-works/pi-coding-agent": "^0.80.3",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "base64url": "^3.0.1",
         "got": "^11.8.6",
-        "onnxruntime-web": "^1.27.0",
         "semver": "^7.8.5",
         "zod": "^3.25.76"
     },
