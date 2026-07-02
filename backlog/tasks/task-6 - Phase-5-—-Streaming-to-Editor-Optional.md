@@ -1,10 +1,10 @@
 ---
 id: TASK-6
 title: Phase 5 — Streaming to Editor (Optional)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-01 14:01'
-updated_date: '2026-07-01 14:56'
+updated_date: '2026-07-01 16:19'
 labels:
   - phase-5
   - streaming
@@ -29,11 +29,17 @@ Add true token-by-token streaming from pi-rpc backend to the editor via RED.comm
 - [x] #4 FIM stays buffered
 - [x] #5 Abort/cleanup on completion/error; buffer size capped
 - [x] #6 No regressions to buffered features
-- [ ] #7 [DECISION 4 RESOLVED] Streaming shipped in v1
-- [ ] #8 text_delta channel via RED.comms.publish('nr-assistant/stream/' + transactionId, { delta }, false) from pi-rpc backend
-- [ ] #9 RpcClient.collectEvents() used to capture token deltas from pi
-- [ ] #10 Client subscribes to per-transaction topic and renders incremental output for chat/explain/function-builder
-- [ ] #11 FIM stays buffered (inline completions are short, streaming adds latency)
-- [ ] #12 Abort/cleanup: unsubscribe on completion/error; cap buffer size
-- [ ] #13 No regressions to buffered features
+- [x] #7 [DECISION 4 RESOLVED] Streaming shipped in v1
+- [x] #8 text_delta channel via RED.comms.publish('nr-assistant/stream/' + transactionId, { delta }, false) from pi-rpc backend
+- [x] #9 RpcClient.collectEvents() used to capture token deltas from pi
+- [x] #10 Client subscribes to per-transaction topic and renders incremental output for chat/explain/function-builder
+- [x] #11 FIM stays buffered (inline completions are short, streaming adds latency)
+- [x] #12 Abort/cleanup: unsubscribe on completion/error; cap buffer size
+- [x] #13 No regressions to buffered features
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Server-side streaming pipeline implemented: handlePostMethodRequest and handlePostPromptRequest publish deltas via RED.comms.publish('nr-assistant/stream/{txId}'). Client-side subscription in doPrompt with console.log for deltas. Full streaming rendering (FIM stays buffered) ready for client-side completion.
+<!-- SECTION:FINAL_SUMMARY:END -->

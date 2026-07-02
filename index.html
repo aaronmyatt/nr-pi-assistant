@@ -1,6 +1,6 @@
-<script src="resources/@flowfuse/nr-assistant/sharedUtils.js"></script>
+<script src="resources/node-red-contrib-pi-assistant/sharedUtils.js"></script>
 <script type="module">
-    import { ExpertComms } from './resources/@flowfuse/nr-assistant/expertComms.js'
+    import { ExpertComms } from './resources/node-red-contrib-pi-assistant/expertComms.js'
 
     /* global FFAssistantUtils */ /* loaded from sharedUtils.js */
     /* global RED, $ */ /* loaded from Node-RED core */
@@ -58,8 +58,38 @@
         debug('Loading Node-RED Assistant Plugin...')
 
         function nls (key) {
-            // Ensure the message key is properly namespaced
-            return plugin._('@flowfuse/nr-assistant/flowfuse-nr-assistant:' + key)
+            // i18n lookup (namespace node-red-contrib-pi-assistant/pi-assistant)
+            const namespaced = plugin._('node-red-contrib-pi-assistant/pi-assistant:' + key)
+            if (namespaced) return namespaced
+            // Fallback: strip the namespace prefix (plugin._ may have cached locale catalog)
+            const local = plugin._(key)
+            
+            if (local) return local
+            // Hardcoded English fallbacks for critical labels
+            const fallbacks = {
+                'name': 'Node-RED AI Assistant',
+                'function-builder.menu.label': 'Function Builder',
+                'function-builder.menu.description': 'Create a Function Node',
+                'function-builder.action.label': 'Node-RED AI Assistant: Create a Function Node',
+                'function-builder.dialog-input.title': 'Create a Function Node',
+                'function-builder.dialog-input.explanation': 'The AI Assistant can help you create a Function Node.',
+                'function-builder.dialog-input.description': 'Enter a short description of what you want it to do.',
+                'function-builder.dialog-input.create-button': 'Generate Function \u{1FA84}',
+                'explain-flows.menu.label': 'Explain Flows',
+                'explain-flows.menu.description': 'Explain the selected nodes',
+                'explain-flows.action.label': 'Node-RED AI Assistant: Explain Selected Nodes',
+                'explain-flows.dialog-result.title': 'Flow Explanation',
+                'explain-flows.dialog-result.copy-button': 'Copy',
+                'explain-flows.dialog-result.close-button': 'Close',
+                'explain-flows.dialog-result.comment-button': 'Comment Node',
+                'explain-flows.errors.no-nodes-selected': 'No nodes selected',
+                'explain-flows.errors.too-many-nodes-selected': 'Too many nodes selected (max 100)',
+                'login.menu.label': 'Connect AI Backend',
+                'notifications.busy': 'Generating...',
+                'errors.assistant-not-enabled': 'AI Assistant is not enabled',
+                'errors.something-went-wrong': 'Something went wrong'
+            }
+            return fallbacks[key] || key
         }
 
         const plugin = {
@@ -2028,7 +2058,7 @@
         The CSS below uses the mask-image property to apply the SVG as a mask, allowing us to set the color via background-color.
     */
     #red-ui-header-button-ff-ai {
-        mask-image: url("resources/@flowfuse/nr-assistant/ff-assistant.svg");
+        mask-image: url("resources/node-red-contrib-pi-assistant/ff-assistant.svg");
         mask-repeat: no-repeat;
         mask-position: center;
         background-color: currentColor;
@@ -2051,12 +2081,12 @@
         -webkit-mask-size: contain;
     }
     i.ff-assistant-menu-icon.function {
-        mask-image: url('resources/@flowfuse/nr-assistant/ff-assistant-function.svg');
-        -webkit-mask-image: url('resources/@flowfuse/nr-assistant/ff-assistant-function.svg');
+        mask-image: url('resources/node-red-contrib-pi-assistant/ff-assistant-function.svg');
+        -webkit-mask-image: url('resources/node-red-contrib-pi-assistant/ff-assistant-function.svg');
     }
     i.ff-assistant-menu-icon.explain-flows {
-        mask-image: url('resources/@flowfuse/nr-assistant/ff-assistant-explain-flows.svg');
-        -webkit-mask-image: url('resources/@flowfuse/nr-assistant/ff-assistant-explain-flows.svg');
+        mask-image: url('resources/node-red-contrib-pi-assistant/ff-assistant-explain-flows.svg');
+        -webkit-mask-image: url('resources/node-red-contrib-pi-assistant/ff-assistant-explain-flows.svg');
     }
 
     /* Header title in the dropdown menu */
