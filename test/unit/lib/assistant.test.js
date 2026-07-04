@@ -258,7 +258,24 @@ describe('assistant', () => {
     it('should not require a token (token is now optional)', async () => {
         // With the AiBackend abstraction, tokens are optional.
         // The FlowFuseBackend accepts null tokens (for standalone/unauthenticated use).
-        // pi backends use env vars instead.
+        // The direct DeepSeek backend uses a server-side env var or injected apiKey.
+    })
+
+    it('should initialize with the direct DeepSeek backend without requiring a FlowFuse URL', async () => {
+        const options = {
+            ...RED.settings.flowforge.assistant,
+            backend: 'deepseek',
+            apiKey: 'sk-test',
+            got: fakeGot
+        }
+        delete options.url
+
+        await assistant.init(RED, options)
+
+        assistant.backend.should.be.ok()
+        assistant.backend.constructor.name.should.equal('DeepSeekBackend')
+        assistant.isInitialized.should.be.true()
+        assistant.isLoading.should.be.false()
     })
 
     it('should skip loading completions for node-red < 4.1', async () => {

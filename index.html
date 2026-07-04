@@ -1,6 +1,9 @@
 <script src="resources/node-red-contrib-pi-assistant/sharedUtils.js"></script>
 <script type="module">
     import { ExpertComms } from './resources/node-red-contrib-pi-assistant/expertComms.js'
+    import { AssistantHintsSidebar } from './resources/node-red-contrib-pi-assistant/hintsSidebar.js'
+    import { AutoLabeler } from './resources/node-red-contrib-pi-assistant/autoLabeler.js'
+    import { getNodeInstanceContext, toPromptNodeContext } from './resources/node-red-contrib-pi-assistant/nodeContext.js'
 
     /* global FFAssistantUtils */ /* loaded from sharedUtils.js */
     /* global RED, $ */ /* loaded from Node-RED core */
@@ -31,6 +34,7 @@
          * @property {Array<string>} [outputs] - The count of outputs the node has (typically only for function nodes)
          * @property {Boolean} [modulesAllowed] - Whether external modules are allowed in the function node
          * @property {Array<{module:string, var:string}>} [modules] - The list of modules setup/available (typically only for function nodes)
+         * @property {Object} [nodeContext] - Prompt-friendly enriched node metadata derived from local node definitions/help.
          */
 
         /**
@@ -55,6 +59,10 @@
         let assistantInitialised = false
         /** @type {ExpertComms} */
         let FFExpertComms = null
+        /** @type {AssistantHintsSidebar|null} */
+        let hintsSidebar = null
+        /** @type {AutoLabeler|null} */
+        let autoLabeler = null
         debug('Loading Node-RED Assistant Plugin...')
 
         function nls (key) {
@@ -167,8 +175,8 @@
             RED.menu.init({ id: 'red-ui-header-button-ff-ai', options: ffAssistantMenu })
         }
         function showLoginPrompt () {
-            // FlowFuse login has been removed. The plugin is self-hosted with pi.
-            // Auth is handled via env vars (DEEPSEEK_API_KEY, etc.) in the Node-RED runtime.
+            // FlowFuse login has been removed. The plugin is self-hosted.
+            // Auth is handled via a server-side API key in the Node-RED runtime.
             RED.notify('This plugin uses local AI backends. Configure your API key in the Node-RED settings.', { type: 'info' })
         }
 
@@ -180,7 +188,7 @@
                 createAssistantMenu()
                 if (assistantOptions.standalone) {
                     // In standalone/self-hosted mode, show a connect button that explains
-                    // the plugin uses local AI backends (pi) with env-var API keys.
+                    // the plugin uses a local server-side AI backend with env-var API keys.
                     RED.menu.addItem('red-ui-header-button-ff-ai', {
                         id: 'ff-assistant-login',
                         label: `<span>${nls('login.menu.label')}</span>`,
@@ -217,11 +225,30 @@
                 FFExpertComms = new ExpertComms()
                 FFExpertComms.init(RED, assistantOptions)
 
+                // The hints sidebar is the main editor-facing surface for the
+                // node-context work from TASK-12.1. It stays available while edit
+                // dialogs are open so the user can read help and suggestions
+                // without closing the tray.
+                hintsSidebar = new AssistantHintsSidebar()
+                hintsSidebar.init({ RED, assistantOptions })
+
+                autoLabeler = new AutoLabeler()
+                autoLabeler.init({ RED, hintsSidebar })
+
                 registerMonacoExtensions()
                 RED.actions.add('flowfuse-nr-assistant:function-builder', showFunctionBuilderPrompt, { label: '@flowfuse/nr-assistant/flowfuse-nr-assistant:function-builder.action.label' })
                 setMenuShortcutKey('ff-assistant-function-builder', 'red-ui-workspace', 'ctrl-alt-f', 'flowfuse-nr-assistant:function-builder')
                 assistantInitialised = true
             }
+        }
+
+        function getPromptNodeContext (node) {
+            // Reuse the shared node-context helper so AI prompts, future hints,
+            // and auto-labelling all reason about the same metadata source.
+            // We intentionally send the prompt-friendly projection rather than
+            // the full HTML help blob to keep editor requests concise.
+            const nodeContext = getNodeInstanceContext({ RED, node, doc: document })
+            return toPromptNodeContext(nodeContext)
         }
 
         function registerMonacoExtensions () {
@@ -849,7 +876,8 @@
                         languageId: model.getLanguageIdAtPosition(position.lineNumber, position.column),
                         nodeName: node.name || node.type,
                         nodeType: node.type,
-                        nodeModule: node._def?.set?.module || 'node-red'
+                        nodeModule: node._def?.set?.module || 'node-red',
+                        nodeContext: getPromptNodeContext(node)
                     }
 
                     context.outputs = +(node.outputs || 1)
@@ -1205,7 +1233,8 @@
                         subType: promptOptions.subType,
                         scope: 'inline', // inline denotes that the prompt is for a inline codelens action (i.e. the monaco editor)
                         modulesAllowed,
-                        codeSection: promptOptions.subType
+                        codeSection: promptOptions.subType,
+                        nodeContext: getPromptNodeContext(node)
                         // selection: selectedText // FUTURE: include the selected text in the context for features like "fix my code", "refactor this", "what is this?" etc
                     }
                 }
@@ -1371,7 +1400,7 @@
                         success: (reply, textStatus, jqXHR) => {
                             busyNotification.close()
                             try {
-                                // pi backend returns { transactionId, data: { func, outputs, node_modules } }
+                                // AI backends return { transactionId, data: { func, outputs, node_modules } }
                                 const funcData = reply?.data?.data
                                 if (funcData?.func) {
                                     // Create a minimal function node — importFlow handles IDs and placement

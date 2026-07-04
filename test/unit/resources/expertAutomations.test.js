@@ -2956,6 +2956,35 @@ describeMain('expertAutomations', () => {
                 result.data.function.defaults.name.validate.should.have.property('type', 'function')
                 result.data.function.defaults.name.validate.should.have.property('data').which.is.a.String()
             })
+            it('should include installed help summaries when local help is available', async () => {
+                global.document = {
+                    querySelector: sinon.stub().returns({
+                        innerHTML: '<p>Transforms incoming messages.</p><p>More detail.</p>',
+                        getAttribute: sinon.stub().returns('text/html')
+                    })
+                }
+                mockRED.nodes.getType = sinon.stub().returns({
+                    set: { module: 'node-red' },
+                    inputs: 1,
+                    outputs: 1,
+                    category: 'function',
+                    defaults: {
+                        name: { value: '' },
+                        func: { value: '' }
+                    }
+                })
+                const result = {}
+                await expertAutomations.invokeAction('automation/get-node-types', {
+                    params: { types: ['function'] }
+                }, result)
+                result.should.have.property('success', true)
+                result.data.function.should.have.property('module', 'node-red')
+                result.data.function.should.have.property('helpSummary', 'Transforms incoming messages.')
+                result.data.function.should.have.property('helpTooltip', 'Transforms incoming messages.')
+                result.data.function.should.have.property('helpHtml').which.match(/Transforms incoming messages/)
+                result.data.function.defaultProperties.should.deepEqual(['name', 'func'])
+                delete global.document
+            })
             it('should encode Set, Map, RegExp, and non-finite numbers in defaults', async () => {
                 mockRED.nodes.getType = sinon.stub().returns({
                     inputs: 1,

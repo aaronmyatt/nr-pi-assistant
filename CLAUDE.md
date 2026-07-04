@@ -73,8 +73,8 @@ The plugin is linked via `npm link`:
 | `completions.html` | Autocomplete UI (predict_next, FIM inline) |
 | `lib/assistant.js` | Core singleton: handlers, MCP, backend wiring |
 | `lib/ai/backend.js` | AiBackend interface |
-| `lib/ai/backends/pi-rpc.js` | pi --mode rpc subprocess backend |
-| `lib/ai/backends/flowfuse.js` | Legacy FlowFuse backend (parity testing) |
+| `lib/ai/backends/deepseek.js` | Direct DeepSeek API backend |
+| `lib/ai/backends/flowfuse.js` | Legacy FlowFuse backend (compatibility/parity testing) |
 | `lib/ai/prompts/*.md` | System prompts for each AI feature |
 | `lib/settings.js` | Plugin settings resolver |
 

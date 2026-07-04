@@ -1,6 +1,6 @@
 # node-red-contrib-pi-assistant
 
-**Node-RED AI Assistant** powered by [pi](https://github.com/earendil-works/pi) — a self-hosted, bring-your-own-key AI plugin for Node-RED.
+**Node-RED AI Assistant** with a direct DeepSeek backend — a self-hosted, bring-your-own-key AI plugin for Node-RED.
 
 Originally forked from [FlowFuse/nr-assistant](https://github.com/FlowFuse/nr-assistant) (Apache-2.0).
 
@@ -29,15 +29,10 @@ npm install /path/to/node-red-contrib-pi-assistant
 
 ### API Key (required)
 
-Set your provider's API key as an environment variable:
+Set your DeepSeek API key as an environment variable:
 
 ```bash
-# DeepSeek (default provider)
 export DEEPSEEK_API_KEY=sk-your-key-here
-
-# Or: OpenAI, Anthropic, Google, etc.
-export OPENAI_API_KEY=sk-...
-export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### Node-RED Settings (`settings.js`)
@@ -46,10 +41,10 @@ export ANTHROPIC_API_KEY=sk-ant-...
 flowfuse: {
     assistant: {
         enabled: true,
-        backend: 'pi-rpc',           // 'pi-rpc' (default) or 'flowfuse' (legacy)
-        provider: 'deepseek',        // LLM provider name
-        model: null,                 // Model ID (null = provider default)
-        requestTimeout: 60000,       // Request timeout in ms
+        backend: 'deepseek',         // direct DeepSeek API backend
+        baseUrl: 'https://api.deepseek.com',
+        model: 'deepseek-v4-flash',
+        requestTimeout: 30000,
         completions: {
             enabled: true,
             inlineEnabled: true
@@ -63,40 +58,39 @@ flowfuse: {
 
 | Backend | Description |
 |---------|-------------|
-| `pi-rpc` | Spawns `pi --mode rpc` subprocess. Uses provider API keys from env vars. **Default.** |
-| `flowfuse` | Legacy FlowFuse Cloud backend. Requires a FlowFuse account and token. Disabled by default. |
+| `deepseek` | Direct DeepSeek API transport. Uses `DEEPSEEK_API_KEY` from the server environment. Recommended. |
+| `flowfuse` | Legacy FlowFuse Cloud backend. Requires a FlowFuse account and token. Optional compatibility path. |
 
 ## Architecture
 
 ```
-editor → POST /nr-assistant/:method → handler → AiBackend.run() → pi --mode rpc → LLM provider
+editor → POST /nr-assistant/:method → handler → AiBackend.run() → DeepSeek API
 ```
 
 The plugin uses a pluggable `AiBackend` interface (`lib/ai/backend.js`). Backend implementations live in `lib/ai/backends/`:
-- `pi-rpc.js` — pi subprocess via `@earendil-works/pi-coding-agent` RpcClient
-- `flowfuse.js` — original FlowFuse HTTP backend (parity testing)
+- `deepseek.js` — direct DeepSeek API backend
+- `flowfuse.js` — original FlowFuse HTTP backend (compatibility/parity testing)
 
 ## Requirements
 
 - Node-RED >= 4.1
 - Node.js >= 20
-- A provider API key (DeepSeek, OpenAI, Anthropic, etc.)
+- A DeepSeek API key
 
 ## Privacy
 
-Data is sent directly to your chosen LLM provider via pi. No data goes to FlowFuse or any third party. Your API key stays in your environment.
+Data is sent directly to DeepSeek from the Node-RED plugin. No data goes to FlowFuse unless you explicitly choose the legacy FlowFuse backend. Your API key stays in your server environment.
 
 ## License
 
 Apache-2.0 — original FlowFuse/nr-assistant code preserved with attribution.
 
-pi integration: MIT license (earendil-works/pi).
 
 ## Development
 
 ```bash
 npm install
-npm test        # 446 tests
+npm test        # 452 tests
 npm run lint    # ESLint
 ```
 

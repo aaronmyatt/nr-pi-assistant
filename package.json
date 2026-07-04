@@ -1,7 +1,7 @@
 {
     "name": "node-red-contrib-pi-assistant",
     "version": "0.17.0",
-    "description": "Node-RED AI Assistant plugin powered by pi (earendil-works/pi) — self-hosted, bring-your-own-key",
+    "description": "Node-RED AI Assistant plugin with a direct DeepSeek backend — self-hosted, bring-your-own-key",
     "main": "index.js",
     "scripts": {
         "test": "mocha --exit \"test/**/*.test.js\"",
@@ -39,8 +39,6 @@
         "node": ">=16.x"
     },
     "dependencies": {
-        "@earendil-works/pi-ai": "^0.80.3",
-        "@earendil-works/pi-coding-agent": "^0.80.3",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "base64url": "^3.0.1",
         "got": "^11.8.6",

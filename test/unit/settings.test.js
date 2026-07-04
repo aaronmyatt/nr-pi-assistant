@@ -43,6 +43,21 @@ describe('settings', function () {
             result.completions.vocabularyUrl.should.equal('http://vocab')
         })
 
+        it('should preserve direct DeepSeek transport settings', async function () {
+            RED.settings.flowforge.assistant = {
+                enabled: true,
+                backend: 'deepseek',
+                baseUrl: 'https://api.deepseek.com',
+                model: 'deepseek-v4-flash',
+                requestTimeout: 15000
+            }
+            const result = await settings.getSettings(RED)
+            result.backend.should.equal('deepseek')
+            result.baseUrl.should.equal('https://api.deepseek.com')
+            result.model.should.equal('deepseek-v4-flash')
+            result.requestTimeout.should.equal(15000)
+        })
+
         it('should set tables.enabled false by default (tables are FlowFuse-only)', async function () {
             RED.settings.flowforge.tables = { token: 'abc' }
             RED.settings.flowforge.assistant = { enabled: true }

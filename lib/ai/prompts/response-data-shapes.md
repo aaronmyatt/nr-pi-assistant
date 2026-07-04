@@ -1,6 +1,6 @@
 # Response Data Shapes (Recovered from Client Code)
 
-This documents the contract between the server handlers (`lib/assistant.js`) and the browser client (`index.html`, `completions.html`). When implementing pi backends, ensure the returned `data` matches these shapes exactly.
+This documents the contract between the server handlers (`lib/assistant.js`) and the browser client (`index.html`, `completions.html`). Any backend implementation must ensure the returned `data` matches these shapes exactly.
 
 Source files: `index.html` (doPrompt, explainSelectedNodes, inline completions), `completions.html` (predict_next), `lib/assistant.js` (handlers).
 
