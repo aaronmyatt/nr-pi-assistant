@@ -100,6 +100,7 @@ function createFakeElement () {
 
 describeMain('AssistantHintsSidebar', function () {
     let AssistantHintsSidebar
+    let fingerprintNode
     let TAB_ID
     let SHOW_ACTION_ID
     let sidebar
@@ -111,6 +112,9 @@ describeMain('AssistantHintsSidebar', function () {
         AssistantHintsSidebar = module.AssistantHintsSidebar
         TAB_ID = module.TAB_ID
         SHOW_ACTION_ID = module.SHOW_ACTION_ID
+
+        const dagModule = await import('../../../resources/dagSerializer.js')
+        fingerprintNode = dagModule.fingerprintNode
 
         selectedNodes = []
         global.document = {
@@ -409,11 +413,11 @@ describeMain('AssistantHintsSidebar', function () {
             method: 'GET'
         }
 
-        const fp1 = sidebar._configFingerprint(node)
+        const fp1 = fingerprintNode({ node, upstream: [], downstream: [] })
 
         // Change the URL
         node.url = 'https://api.different.com'
-        const fp2 = sidebar._configFingerprint(node)
+        const fp2 = fingerprintNode({ node, upstream: [], downstream: [] })
 
         fp1.should.not.equal(fp2)
     })
@@ -428,7 +432,7 @@ describeMain('AssistantHintsSidebar', function () {
         })
 
         const node = { id: 'n1', type: 'function', wires: [] }
-        const fp1 = sidebar._configFingerprint(node)
+        const fp1 = fingerprintNode({ node, upstream: [upstreamNode], downstream: [] })
 
         // Add a downstream wire
         node.wires = [['n2']]
@@ -440,7 +444,7 @@ describeMain('AssistantHintsSidebar', function () {
         })
         RED.nodes.node.withArgs('n2').returns(downstreamNode)
 
-        const fp2 = sidebar._configFingerprint(node)
+        const fp2 = fingerprintNode({ node, upstream: [upstreamNode], downstream: [downstreamNode] })
         fp1.should.not.equal(fp2)
     })
 
@@ -466,7 +470,7 @@ describeMain('AssistantHintsSidebar', function () {
         const nodeContext = { type: 'function', helpSummary: 'Runs code.', inputs: 1, outputs: 1 }
 
         // Manually populate the cache
-        const fp = sidebar._configFingerprint(node)
+        const fp = fingerprintNode({ node, upstream: [], downstream: [] })
         sidebar._aiHintsCache.set('n1', { fingerprint: fp, hints: ['Cached hint 1'], timestamp: Date.now() })
 
         // Mock inject so we can verify it was called

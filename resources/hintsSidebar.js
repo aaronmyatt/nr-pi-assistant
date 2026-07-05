@@ -29,6 +29,13 @@
 //   RED.events.emit('view:selection-changed', { nodes: [RED.view.selection().nodes[0]] })
 
 import { getNodeInstanceContext, toPromptNodeContext } from './nodeContext.js'
+import {
+    stripNodeCruft,
+    fingerprintNode,
+    getFlowName,
+    buildFlowContextText,
+    buildConnectedNodesText
+} from './dagSerializer.js'
 
 const TAB_ID = 'nr-assistant-hints'
 const SHOW_ACTION_ID = 'flowfuse-nr-assistant:show-hints'
@@ -388,65 +395,6 @@ export class AssistantHintsSidebar {
         return config
     }
 
-    /**
-     * Dump ALL node properties for the AI, truncating large values.
-     *
-     * Unlike _getConfigSummary which filters aggressively, this sends
-     * everything so DeepSeek sees the full picture. We still skip truly
-     * internal/circular properties but include all config values.
-     *
-     * @param {Object} node
-     * @returns {Object}
-     */
-    _getRawConfig (node) {
-        const skipKeys = new Set([
-            'id', 'type', 'name', 'x', 'y', 'z', 'wires', 'd', 'g', 'l',
-            'inputs', 'outputs', '_def', '_alias', '_flow', 'disabled'
-            // 'info' intentionally kept — it's the user's own description of
-            // what this node should do.
-        ])
-
-        const config = {}
-        for (const key of Object.keys(node)) {
-            if (skipKeys.has(key)) continue
-            if (key.startsWith('_')) continue
-
-            const value = node[key]
-            if (value === undefined || value === null) continue
-
-            if (typeof value === 'string') {
-                // Truncate long strings but still include them (unlike _getConfigSummary)
-                config[key] = value.length > 500 ? value.slice(0, 500) + '...' : value
-            } else if (typeof value === 'object') {
-                try {
-                    const json = JSON.stringify(value)
-                    config[key] = json.length > 500 ? json.slice(0, 500) + '...' : json
-                } catch (_e) {
-                    config[key] = '[non-serializable]'
-                }
-            } else {
-                // booleans, numbers — include directly
-                config[key] = value
-            }
-        }
-        return config
-    }
-
-    /**
-     * Get the name of the currently active workspace/flow tab.
-     *
-     * @returns {string}
-     */
-    _getFlowName () {
-        try {
-            const activeTab = this.RED?.workspaces?.active?.()
-            if (!activeTab) return 'unknown flow'
-            const tab = this.RED?.nodes?.workspace?.(activeTab) || this.RED?.nodes?.subflow?.(activeTab)
-            return tab?.label || tab?.name || 'untitled flow'
-        } catch (_e) {
-            return 'unknown flow'
-        }
-    }
 
     // ── AI hint prompt building ─────────────────────────────────────────────
 
@@ -509,7 +457,7 @@ export class AssistantHintsSidebar {
         }
 
         // ── Raw configuration (every property on the node, unfiltered) ──
-        const rawConfig = this._getRawConfig(node)
+        const rawConfig = stripNodeCruft(node)
         if (Object.keys(rawConfig).length > 0) {
             parts.push('')
             parts.push('  RAW CONFIGURATION:')
@@ -535,92 +483,11 @@ export class AssistantHintsSidebar {
         }
 
         // ── Explicitly connected nodes (upstream and downstream) ──────
-        // This is the MOST IMPORTANT section for the LLM. Without it, hints
-        // will suggest adding nodes that are already wired. We show readable
-        // labels (type + user name) so the LLM can see the actual topology.
         const { upstream, downstream } = this._getConnectedNodes(node)
-
-        if (upstream.length > 0) {
-            parts.push('')
-            parts.push('UPSTREAM — nodes wired INTO this node (already connected, DO NOT suggest adding):')
-            for (const u of upstream) {
-                const uname = u.name ? ` "${u.name}"` : ''
-                parts.push(`  [${u.type}]${uname}`)
-            }
-        } else {
-            parts.push('')
-            parts.push('UPSTREAM: none (this node has no input connections yet)')
-        }
-
-        if (downstream.length > 0) {
-            parts.push('')
-            parts.push('DOWNSTREAM — nodes this node feeds INTO (already connected, DO NOT suggest adding):')
-            for (const d of downstream) {
-                const dname = d.name ? ` "${d.name}"` : ''
-                parts.push(`  [${d.type}]${dname}`)
-            }
-        } else {
-            parts.push('')
-            parts.push('DOWNSTREAM: none (this node has no output connections yet)')
-        }
+        parts.push(buildConnectedNodesText({ upstream, downstream }))
 
         // ── Full flow context (all nodes in the current tab) ──
-        // We send the entire canvas so DeepSeek understands what the user is
-        // building and can suggest meaningful next steps.
-        const flowName = this._getFlowName()
-        parts.push('')
-        parts.push(`FLOW CONTEXT — all nodes in the tab "${flowName}":`)
-        parts.push('')
-
-        // Collect all nodes in the current workspace
-        const allNodes = []
-        if (typeof this.RED?.nodes?.eachNode === 'function') {
-            this.RED.nodes.eachNode((n) => { allNodes.push(n) })
-        } else if (typeof this.RED?.nodes?.filterNodes === 'function') {
-            const result = this.RED.nodes.filterNodes({})
-            if (Array.isArray(result)) allNodes.push(...result)
-        }
-
-        // Build a compact node listing: type, name, wiring as readable edges.
-        // Using node types/names instead of IDs so the LLM can understand
-        // the topology (IDs are opaque strings).
-        const nodeListing = []
-        // First build an id→label lookup for readable wire annotations.
-        const idLabel = {}
-        for (const n of allNodes) {
-            const label = n.name ? `"${n.name}"` : `[${n.type}]`
-            idLabel[n.id] = `${n.type} ${label}`.trim()
-        }
-
-        for (const n of allNodes) {
-            const marker = n.id === node.id ? ' ★ SELECTED' : ''
-            const label = n.name ? `"${n.name}"` : ''
-            const nodeDesc = `[${n.type}]${marker} ${label}`.trim()
-
-            // Show wiring as edges with readable target labels.
-            const wires = []
-            if (Array.isArray(n.wires)) {
-                for (const w of n.wires) {
-                    if (Array.isArray(w) && w.length > 0) {
-                        wires.push(...w.filter(Boolean).map(tid => {
-                            const tLabel = idLabel[tid] || tid
-                            return `${n.type}→${tLabel}`
-                        }))
-                    }
-                }
-            }
-
-            if (wires.length > 0) {
-                nodeListing.push(`${nodeDesc}`)
-                for (const wire of wires) {
-                    nodeListing.push(`  wire: ${wire}`)
-                }
-            } else {
-                nodeListing.push(`${nodeDesc} (unwired)`)
-            }
-        }
-
-        parts.push(nodeListing.join('\n') || '  (no nodes in this flow)')
+        parts.push(buildFlowContextText({ RED: this.RED, selectedNode: node }))
 
         return parts.join('\n')
     }
@@ -648,7 +515,7 @@ export class AssistantHintsSidebar {
         this._lastRequestedNode = node
 
         // ── Check cache ──
-        const fingerprint = this._configFingerprint(node)
+        const fingerprint = fingerprintNode({ node, upstream: this._getConnectedNodes(node).upstream, downstream: this._getConnectedNodes(node).downstream })
         const cached = this._aiHintsCache.get(nodeId)
         if (cached && cached.fingerprint === fingerprint) {
             // Cache hit — update the hints section without a full repaint
@@ -940,48 +807,6 @@ export class AssistantHintsSidebar {
                 </div>
             </div>
         `
-    }
-
-    // ── Fingerprinting ──────────────────────────────────────────────────────
-
-    /**
-     * Build a fingerprint of the node's meaningful state for cache invalidation.
-     *
-     * We include type, config fields, and wiring (upstream/downstream node ids).
-     * This ensures we re-request AI hints when the user edits config or re-wires.
-     *
-     * @param {Object} node
-     * @returns {string}
-     */
-    _configFingerprint (node) {
-        const { upstream, downstream } = this._getConnectedNodes(node)
-
-        const meaningful = {
-            t: node.type,
-            c: Object.keys(node)
-                .filter(k => !k.startsWith('_') && k !== 'id' && k !== 'x' && k !== 'y' && k !== 'z' && k !== 'wires' && k !== 'd' && k !== 'g' && k !== 'l' && k !== 'name' && k !== 'type' && k !== 'outputs' && k !== 'inputs')
-                .sort()
-                .map(k => {
-                    const v = node[k]
-                    if (typeof v === 'string' && v.length > 200) {
-                        // Include the first 200 chars — enough to detect meaningful edits
-                        return `${k}:${v.slice(0, 200)}`
-                    }
-                    // Use a try/catch guard: some node properties (especially
-                    // on contrib nodes) contain editor objects with circular
-                    // references that blow up JSON.stringify.
-                    try {
-                        return `${k}:${JSON.stringify(v)}`
-                    } catch (_e) {
-                        return `${k}:[non-serializable]`
-                    }
-                })
-                .join(';'),
-            // Include wiring topology — sorted ids for stability
-            up: upstream.map(n => n.id).sort().join(','),
-            down: downstream.map(n => n.id).sort().join(',')
-        }
-        return JSON.stringify(meaningful)
     }
 }
 
