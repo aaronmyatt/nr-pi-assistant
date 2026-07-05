@@ -1,8 +1,50 @@
+<!-- Inline hint overlay styles (TASK-12.6) — floating panel, bottom-right. -->
+<style>
+    .nr-assistant-inline-hint-panel {
+        position: absolute;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 380px;
+        max-height: 240px;
+        overflow-y: auto;
+        background: #fffef5;
+        border: 1px solid #d9cfa0;
+        border-radius: 8px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+        z-index: 1000;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #4a4a4a;
+        pointer-events: auto;
+    }
+
+    .nr-assistant-inline-hint-header {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #9a8b5a;
+        padding: 10px 14px 6px;
+        border-bottom: 1px solid #f0e8c8;
+    }
+
+    .nr-assistant-inline-hint-body {
+        padding: 6px 14px 12px;
+    }
+
+    .nr-assistant-inline-hint-line {
+        padding: 3px 0;
+        white-space: normal;
+        word-break: break-word;
+    }
+</style>
 <script src="resources/node-red-contrib-pi-assistant/sharedUtils.js"></script>
 <script type="module">
     import { ExpertComms } from './resources/node-red-contrib-pi-assistant/expertComms.js'
     import { AssistantHintsSidebar } from './resources/node-red-contrib-pi-assistant/hintsSidebar.js'
-    import { AutoLabeler } from './resources/node-red-contrib-pi-assistant/autoLabeler.js'
+    import { InlineAnnotations } from './resources/node-red-contrib-pi-assistant/inlineAnnotations.js'
     import { getNodeInstanceContext, toPromptNodeContext } from './resources/node-red-contrib-pi-assistant/nodeContext.js'
 
     /* global FFAssistantUtils */ /* loaded from sharedUtils.js */
@@ -61,8 +103,8 @@
         let FFExpertComms = null
         /** @type {AssistantHintsSidebar|null} */
         let hintsSidebar = null
-        /** @type {AutoLabeler|null} */
-        let autoLabeler = null
+        /** @type {InlineAnnotations|null} */
+        let inlineAnnotations = null
         debug('Loading Node-RED Assistant Plugin...')
 
         function nls (key) {
@@ -232,8 +274,13 @@
                 hintsSidebar = new AssistantHintsSidebar()
                 hintsSidebar.init({ RED, assistantOptions })
 
-                autoLabeler = new AutoLabeler()
-                autoLabeler.init({ RED, hintsSidebar })
+                // Inline annotations render AI hints as ephemeral comment nodes
+                // directly on the canvas (TASK-12.6). It subscribes to the
+                // `nr-assistant:hints-ready` event emitted by hintsSidebar, so
+                // the sidebar stays the data-fetcher and this module owns
+                // canvas rendering.
+                inlineAnnotations = new InlineAnnotations()
+                inlineAnnotations.init({ RED, hintsSidebar })
 
                 registerMonacoExtensions()
                 RED.actions.add('flowfuse-nr-assistant:function-builder', showFunctionBuilderPrompt, { label: '@flowfuse/nr-assistant/flowfuse-nr-assistant:function-builder.action.label' })
