@@ -1,11 +1,11 @@
 ---
 id: TASK-12.3
 title: Generate node labels opportunistically after add/edit/wire changes
-status: In Progress
+status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-03 15:36'
-updated_date: '2026-07-03 17:02'
+updated_date: '2026-07-04 14:27'
 labels:
   - ai
   - editor
@@ -18,7 +18,7 @@ references:
   - resources/expertAutomations.js
 parent_task_id: TASK-12
 priority: high
-ordinal: 15000
+ordinal: 125
 ---
 
 ## Description

@@ -1,17 +1,17 @@
 ---
 id: TASK-12
 title: Context-aware guidance and auto-labeling
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-03 15:35'
-updated_date: '2026-07-03 15:37'
+updated_date: '2026-07-04 14:27'
 labels:
   - ai
   - editor
   - ux
 dependencies: []
 priority: high
-ordinal: 12000
+ordinal: 62.5
 ---
 
 ## Description
