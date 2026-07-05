@@ -534,6 +534,36 @@ export class AssistantHintsSidebar {
             parts.push(`\n  TEMPLATE BODY:\n\`\`\`\n${truncated}\n\`\`\``)
         }
 
+        // ── Explicitly connected nodes (upstream and downstream) ──────
+        // This is the MOST IMPORTANT section for the LLM. Without it, hints
+        // will suggest adding nodes that are already wired. We show readable
+        // labels (type + user name) so the LLM can see the actual topology.
+        const { upstream, downstream } = this._getConnectedNodes(node)
+
+        if (upstream.length > 0) {
+            parts.push('')
+            parts.push('UPSTREAM — nodes wired INTO this node (already connected, DO NOT suggest adding):')
+            for (const u of upstream) {
+                const uname = u.name ? ` "${u.name}"` : ''
+                parts.push(`  [${u.type}]${uname}`)
+            }
+        } else {
+            parts.push('')
+            parts.push('UPSTREAM: none (this node has no input connections yet)')
+        }
+
+        if (downstream.length > 0) {
+            parts.push('')
+            parts.push('DOWNSTREAM — nodes this node feeds INTO (already connected, DO NOT suggest adding):')
+            for (const d of downstream) {
+                const dname = d.name ? ` "${d.name}"` : ''
+                parts.push(`  [${d.type}]${dname}`)
+            }
+        } else {
+            parts.push('')
+            parts.push('DOWNSTREAM: none (this node has no output connections yet)')
+        }
+
         // ── Full flow context (all nodes in the current tab) ──
         // We send the entire canvas so DeepSeek understands what the user is
         // building and can suggest meaningful next steps.
@@ -551,30 +581,42 @@ export class AssistantHintsSidebar {
             if (Array.isArray(result)) allNodes.push(...result)
         }
 
-        // Build a compact node listing: type, name, wiring as edges
+        // Build a compact node listing: type, name, wiring as readable edges.
+        // Using node types/names instead of IDs so the LLM can understand
+        // the topology (IDs are opaque strings).
         const nodeListing = []
+        // First build an id→label lookup for readable wire annotations.
+        const idLabel = {}
+        for (const n of allNodes) {
+            const label = n.name ? `"${n.name}"` : `[${n.type}]`
+            idLabel[n.id] = `${n.type} ${label}`.trim()
+        }
+
         for (const n of allNodes) {
             const marker = n.id === node.id ? ' ★ SELECTED' : ''
             const label = n.name ? `"${n.name}"` : ''
             const nodeDesc = `[${n.type}]${marker} ${label}`.trim()
 
-            // Show wiring as edges for the LLM
+            // Show wiring as edges with readable target labels.
             const wires = []
             if (Array.isArray(n.wires)) {
                 for (const w of n.wires) {
                     if (Array.isArray(w) && w.length > 0) {
-                        wires.push(...w.filter(Boolean).map(tid => `${n.id}→${tid}`))
+                        wires.push(...w.filter(Boolean).map(tid => {
+                            const tLabel = idLabel[tid] || tid
+                            return `${n.type}→${tLabel}`
+                        }))
                     }
                 }
             }
 
             if (wires.length > 0) {
-                nodeListing.push(`${n.id}: ${nodeDesc}`)
+                nodeListing.push(`${nodeDesc}`)
                 for (const wire of wires) {
                     nodeListing.push(`  wire: ${wire}`)
                 }
             } else {
-                nodeListing.push(`${n.id}: ${nodeDesc} (unwired)`)
+                nodeListing.push(`${nodeDesc} (unwired)`)
             }
         }
 
@@ -601,6 +643,10 @@ export class AssistantHintsSidebar {
         const nodeId = node.id
         if (!nodeId) return
 
+        // Remember the node so hint-resolution exit points can emit a synthetic
+        // event carrying it for downstream consumers (inline annotations).
+        this._lastRequestedNode = node
+
         // ── Check cache ──
         const fingerprint = this._configFingerprint(node)
         const cached = this._aiHintsCache.get(nodeId)
@@ -608,6 +654,7 @@ export class AssistantHintsSidebar {
             // Cache hit — update the hints section without a full repaint
             console.log('[nr-assistant:hints] AI hints cache hit', { nodeId })
             this._injectAIHints(cached.hints)
+            this._emitHintsReady(node, cached.hints)
             return
         }
 
@@ -673,6 +720,7 @@ export class AssistantHintsSidebar {
                     // Cache the empty result so we don't keep re-requesting
                     this._aiHintsCache.set(nodeId, { fingerprint, hints: [], timestamp: Date.now() })
                     this._injectAIHints([])
+                    this._emitHintsReady(node, [])
                     return
                 }
 
@@ -689,6 +737,7 @@ export class AssistantHintsSidebar {
                 })
 
                 this._injectAIHints(hints)
+                this._emitHintsReady(node, hints)
             },
             error: (jqXHR, textStatus, errorThrown) => {
                 this._aiHintsFetching.delete(nodeId)
@@ -744,6 +793,29 @@ export class AssistantHintsSidebar {
             <h4 style="margin-top:0;margin-bottom:4px;">💡 Suggestions</h4>
             <p class="red-ui-text-muted">Couldn't load suggestions. They'll retry when the node changes.</p>
         `
+    }
+
+    /**
+     * Emit a synthetic event carrying resolved hints for downstream consumers
+     * (e.g. InlineAnnotations, which renders them as ephemeral comment nodes).
+     *
+     * This decouples the renderer from the fetcher: hintsSidebar stays the
+     * data source, the inline-annotations module owns canvas rendering. Empty
+     * hints are also emitted so stale annotations get pruned.
+     *
+     * @param {Object} node - The target node the hints describe.
+     * @param {string[]} hints - Resolved hint strings (may be empty).
+     * @returns {void}
+     */
+    _emitHintsReady (node, hints) {
+        try {
+            this.RED?.events?.emit?.('nr-assistant:hints-ready', { node, hints: hints || [] })
+        } catch (error) {
+            console.log('[nr-assistant:hints] hints-ready emit failed', {
+                nodeId: node?.id,
+                error: error?.message || String(error)
+            })
+        }
     }
 
     // ── Label suggestion ────────────────────────────────────────────────────
