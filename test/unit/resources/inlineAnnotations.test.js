@@ -111,15 +111,28 @@ describeMain('InlineAnnotations (panel mode)', function () {
         ann.overlayCount.should.equal(0)
     })
 
-    it('should remove panel on view:selection-changed', function () {
+    it('should remove panel on view:selection-changed (different node)', function () {
         ann.init({ RED })
 
         emitHintsReady({ id: 'n1' }, ['a'])
         ann.overlayCount.should.equal(1)
 
-        RED.events.emit('view:selection-changed', { nodes: [] })
+        // Selection of a different node — should prune
+        RED.events.emit('view:selection-changed', { nodes: [{ id: 'n2' }] })
 
         ann.overlayCount.should.equal(0)
+    })
+
+    it('should NOT prune when selection matches the panel target (cache hit guard)', function () {
+        ann.init({ RED })
+
+        emitHintsReady({ id: 'n1' }, ['a'])
+        ann.overlayCount.should.equal(1)
+
+        // Selection of the same node — should keep the panel
+        RED.events.emit('view:selection-changed', { nodes: [{ id: 'n1' }] })
+
+        ann.overlayCount.should.equal(1)
     })
 
     it('should replace panel when new hints arrive for a different node', function () {

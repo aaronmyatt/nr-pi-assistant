@@ -62,8 +62,14 @@ export class InlineAnnotations {
             this.render(payload)
         })
 
-        // Selection changed → remove the panel.
-        this.RED.events?.on?.('view:selection-changed', () => {
+        // Selection changed → remove the panel, UNLESS the selection matches
+        // the node we just rendered hints for (cache hit case — hintsSidebar
+        // fires its 'view:selection-changed' listener first, which emits
+        // hints-ready and creates the panel; our listener runs second and
+        // should not undo that work).
+        this.RED.events?.on?.('view:selection-changed', (event) => {
+            const selectedId = event?.nodes?.[0]?.id
+            if (selectedId && selectedId === this._activeTargetId) return
             this.pruneAll()
         })
 

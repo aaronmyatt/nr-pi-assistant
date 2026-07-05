@@ -45,6 +45,7 @@
     import { ExpertComms } from './resources/node-red-contrib-pi-assistant/expertComms.js'
     import { AssistantHintsSidebar } from './resources/node-red-contrib-pi-assistant/hintsSidebar.js'
     import { InlineAnnotations } from './resources/node-red-contrib-pi-assistant/inlineAnnotations.js'
+    import { AgentScheduler } from './resources/node-red-contrib-pi-assistant/agentScheduler.js'
     import { getNodeInstanceContext, toPromptNodeContext } from './resources/node-red-contrib-pi-assistant/nodeContext.js'
 
     /* global FFAssistantUtils */ /* loaded from sharedUtils.js */
@@ -271,8 +272,13 @@
                 // node-context work from TASK-12.1. It stays available while edit
                 // dialogs are open so the user can read help and suggestions
                 // without closing the tray.
+                // Shared agent scheduler — enforces dedup, attempt caps,
+                // and fingerprint-keyed caching across all LLM agents.
+                const scheduler = new AgentScheduler()
+                scheduler.register('hint', { maxAttempts: 3 })
+
                 hintsSidebar = new AssistantHintsSidebar()
-                hintsSidebar.init({ RED, assistantOptions })
+                hintsSidebar.init({ RED, assistantOptions, scheduler })
 
                 // Inline annotations render AI hints as ephemeral comment nodes
                 // directly on the canvas (TASK-12.6). It subscribes to the

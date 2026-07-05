@@ -75,28 +75,19 @@ export class AssistantHintsSidebar {
     _maxRetries = 8
 
     // ── AI hint tracking ─────────────────────────────────────────────────
+    // Deprecated in favour of AgentScheduler. Kept as null placeholders
+    // for compatibility during migration. Remove after TASK-12.8.
 
-    /**
-     * Cache for AI-generated hints: nodeId → { fingerprint, hints, timestamp }
-     * We key by nodeId so the cache is naturally invalidated when a node is
-     * deleted and a new one gets the same id.
-     *
-     * @type {Map<string, {fingerprint: string, hints: string[], timestamp: number}>}
-     */
+    /** @type {AgentScheduler|null} */
+    _scheduler = null
+
+    /** @type {Map} @deprecated — legacy fallback when no scheduler */
     _aiHintsCache = new Map()
 
-    /**
-     * Nodes currently being fetched so we don't double-request.
-     *
-     * @type {Set<string>}
-     */
+    /** @type {Set} @deprecated */
     _aiHintsFetching = new Set()
 
-    /**
-     * Per-node attempt counter to cap retries.
-     *
-     * @type {Map<string, number>}
-     */
+    /** @type {Map} @deprecated */
     _aiHintsAttempts = new Map()
 
     // ── Public API ──────────────────────────────────────────────────────────
@@ -105,11 +96,13 @@ export class AssistantHintsSidebar {
      * @param {Object} params
      * @param {import('node-red').NodeRedInstance} params.RED
      * @param {Object} params.assistantOptions
+     * @param {AgentScheduler} [params.scheduler] - Shared agent scheduler.
      * @returns {void}
      */
-    init ({ RED, assistantOptions = {} } = {}) {
+    init ({ RED, assistantOptions = {}, scheduler = null } = {}) {
         this.RED = RED
         this.assistantOptions = assistantOptions
+        this._scheduler = scheduler
         this.contentEl = this._createContentElement()
         this.toolbarEl = this._createToolbarElement()
 
@@ -510,53 +503,55 @@ export class AssistantHintsSidebar {
         const nodeId = node.id
         if (!nodeId) return
 
-        // Remember the node so hint-resolution exit points can emit a synthetic
-        // event carrying it for downstream consumers (inline annotations).
         this._lastRequestedNode = node
 
-        // ── Check cache ──
-        const fingerprint = fingerprintNode({ node, upstream: this._getConnectedNodes(node).upstream, downstream: this._getConnectedNodes(node).downstream })
-        const cached = this._aiHintsCache.get(nodeId)
-        if (cached && cached.fingerprint === fingerprint) {
-            // Cache hit — update the hints section without a full repaint
-            console.log('[nr-assistant:hints] AI hints cache hit', { nodeId })
-            this._injectAIHints(cached.hints)
-            this._emitHintsReady(node, cached.hints)
+        // If no scheduler, fall back to old in-class dedup (backward compat).
+        if (!this._scheduler) {
+            return this._requestAIHintsLegacy(node, nodeContext)
+        }
+
+        const { upstream, downstream } = this._getConnectedNodes(node)
+
+        // ── Acquire a permit from the shared scheduler ──────────────────
+        const permit = this._scheduler.acquire('hint', { node, upstream, downstream })
+
+        if (!permit.allowed) {
+            if (permit.reason) {
+                console.log('[nr-assistant:hints] scheduler denied', { nodeId, reason: permit.reason })
+            }
             return
         }
 
-        // ── Guard against duplicate requests and cap attempts ──
-        if (this._aiHintsFetching.has(nodeId)) return
+        // Cache hit — serve immediately.
+        if (permit.fromCache) {
+            console.log('[nr-assistant:hints] AI hints cache hit (scheduler)', { nodeId })
+            this._injectAIHints(permit.cachedResult)
+            this._emitHintsReady(node, permit.cachedResult)
+            return
+        }
 
-        const attempts = this._aiHintsAttempts.get(nodeId) || 0
-        if (attempts >= MAX_AI_HINT_ATTEMPTS) return
-
-        // ── Build prompt ──
+        // ── Build prompt and make the request ───────────────────────────
         const prompt = this._buildHintPrompt(node, nodeContext)
-        if (!prompt || prompt.length < 20) return
+        if (!prompt || prompt.length < 20) {
+            this._scheduler.release('hint', nodeId)
+            return
+        }
 
-        // ── Check if jQuery is available ──
         if (typeof globalThis.$ === 'undefined' || typeof globalThis.$.ajax !== 'function') {
-            console.log('[nr-assistant:hints] jQuery not available for AI hints request')
+            this._scheduler.release('hint', nodeId)
             return
         }
 
-        // ── Check if AI is enabled ──
         if (!this.assistantOptions?.enabled) {
-            console.log('[nr-assistant:hints] AI not enabled — skipping AI hints')
+            this._scheduler.release('hint', nodeId)
             return
         }
 
-        this._aiHintsFetching.add(nodeId)
-        this._aiHintsAttempts.set(nodeId, attempts + 1)
-
-        const transactionId = `hint-${nodeId}-${Date.now()}`
-
-        console.log('[nr-assistant:hints] requesting AI hints', {
+        console.log('[nr-assistant:hints] requesting AI hints (scheduler)', {
             nodeId,
             nodeType: node.type,
             promptLength: prompt.length,
-            attempt: attempts + 1
+            txn: permit.transactionId
         })
 
         globalThis.$.ajax({
@@ -564,7 +559,7 @@ export class AssistantHintsSidebar {
             type: 'POST',
             data: JSON.stringify({
                 prompt,
-                transactionId,
+                transactionId: permit.transactionId,
                 context: {
                     type: node.type,
                     scope: 'hint',
@@ -574,31 +569,20 @@ export class AssistantHintsSidebar {
             contentType: 'application/json',
             timeout: AI_HINT_TIMEOUT_MS,
             success: (reply) => {
-                this._aiHintsFetching.delete(nodeId)
-
-                // The hint endpoint returns { status: 'ok', data: { hints: [...] } }
-                // The data can be nested at data.data (from DeepSeek _parseResponseText
-                // which puts parsed JSON under data) or directly at data.
                 const hintData = reply?.data?.data || reply?.data
                 const hints = hintData?.hints
 
                 if (!Array.isArray(hints) || hints.length === 0) {
-                    console.log('[nr-assistant:hints] AI hints: no hints in response', { reply })
-                    // Cache the empty result so we don't keep re-requesting
-                    this._aiHintsCache.set(nodeId, { fingerprint, hints: [], timestamp: Date.now() })
+                    // Cache the empty result so we don't keep re-requesting.
+                    this._scheduler.commit('hint', nodeId, [], { node, upstream, downstream })
                     this._injectAIHints([])
                     this._emitHintsReady(node, [])
                     return
                 }
 
-                // Cache and display
-                this._aiHintsCache.set(nodeId, {
-                    fingerprint,
-                    hints,
-                    timestamp: Date.now()
-                })
+                this._scheduler.commit('hint', nodeId, hints, { node, upstream, downstream })
 
-                console.log('[nr-assistant:hints] AI hints received', {
+                console.log('[nr-assistant:hints] AI hints received (scheduler)', {
                     nodeId,
                     hintCount: hints.length
                 })
@@ -607,13 +591,74 @@ export class AssistantHintsSidebar {
                 this._emitHintsReady(node, hints)
             },
             error: (jqXHR, textStatus, errorThrown) => {
-                this._aiHintsFetching.delete(nodeId)
-                // Don't cache on failure — we'll retry if the node changes again
+                this._scheduler.release('hint', nodeId)
                 console.log('[nr-assistant:hints] AI hints request failed', {
                     nodeId,
                     textStatus,
                     errorThrown: errorThrown?.message || String(errorThrown)
                 })
+                this._injectAIHintsError()
+            }
+        })
+    }
+
+    /**
+     * Legacy fallback when no AgentScheduler is provided (backward compat).
+     *
+     * @param {Object} node
+     * @param {Object} nodeContext
+     * @returns {void}
+     */
+    _requestAIHintsLegacy (node, nodeContext) {
+        const nodeId = node.id
+
+        const fingerprint = fingerprintNode({ node, upstream: this._getConnectedNodes(node).upstream, downstream: this._getConnectedNodes(node).downstream })
+        const cached = this._aiHintsCache.get(nodeId)
+        if (cached && cached.fingerprint === fingerprint) {
+            console.log('[nr-assistant:hints] AI hints cache hit (legacy)', { nodeId })
+            this._injectAIHints(cached.hints)
+            this._emitHintsReady(node, cached.hints)
+            return
+        }
+
+        if (this._aiHintsFetching.has(nodeId)) return
+
+        const attempts = this._aiHintsAttempts.get(nodeId) || 0
+        if (attempts >= 3) return
+
+        const prompt = this._buildHintPrompt(node, nodeContext)
+        if (!prompt || prompt.length < 20) return
+
+        if (typeof globalThis.$ === 'undefined' || typeof globalThis.$.ajax !== 'function') return
+        if (!this.assistantOptions?.enabled) return
+
+        this._aiHintsFetching.add(nodeId)
+        this._aiHintsAttempts.set(nodeId, attempts + 1)
+
+        const transactionId = `hint-${nodeId}-${Date.now()}`
+
+        globalThis.$.ajax({
+            url: 'nr-assistant/hint',
+            type: 'POST',
+            data: JSON.stringify({ prompt, transactionId, context: { type: node.type, scope: 'hint', nodeContext: toPromptNodeContext(nodeContext) } }),
+            contentType: 'application/json',
+            timeout: AI_HINT_TIMEOUT_MS,
+            success: (reply) => {
+                this._aiHintsFetching.delete(nodeId)
+                const hintData = reply?.data?.data || reply?.data
+                const hints = hintData?.hints
+                if (!Array.isArray(hints) || hints.length === 0) {
+                    this._aiHintsCache.set(nodeId, { fingerprint, hints: [], timestamp: Date.now() })
+                    this._injectAIHints([])
+                    this._emitHintsReady(node, [])
+                    return
+                }
+                this._aiHintsCache.set(nodeId, { fingerprint, hints, timestamp: Date.now() })
+                this._injectAIHints(hints)
+                this._emitHintsReady(node, hints)
+            },
+            error: (jqXHR, textStatus, errorThrown) => {
+                this._aiHintsFetching.delete(nodeId)
                 this._injectAIHintsError()
             }
         })
