@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:01'
-updated_date: '2026-07-01 16:19'
+updated_date: '2026-07-05 14:31'
 labels:
   - phase-6
   - rebrand
@@ -17,7 +17,7 @@ dependencies:
   - TASK-4
   - TASK-5
 priority: medium
-ordinal: 7000
+ordinal: 24000
 ---
 
 ## Description

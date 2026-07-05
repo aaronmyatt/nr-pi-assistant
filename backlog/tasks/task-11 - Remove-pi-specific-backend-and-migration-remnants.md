@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-03 14:47'
-updated_date: '2026-07-03 15:45'
+updated_date: '2026-07-05 14:31'
 labels:
   - cleanup
   - backend
@@ -13,7 +13,7 @@ labels:
 dependencies:
   - TASK-10
 priority: medium
-ordinal: 11000
+ordinal: 27000
 ---
 
 ## Description

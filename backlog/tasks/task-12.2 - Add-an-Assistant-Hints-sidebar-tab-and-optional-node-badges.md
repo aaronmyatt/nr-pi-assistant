@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-03 15:36'
-updated_date: '2026-07-03 16:57'
+updated_date: '2026-07-05 14:10'
 labels:
   - editor
   - ux
@@ -19,7 +19,7 @@ references:
     /Users/aaronmyatt/.nvm/versions/node/v23.6.1/lib/node_modules/node-red/node_modules/@node-red/editor-client/public/red/red.js
 parent_task_id: TASK-12
 priority: high
-ordinal: 250
+ordinal: 14000
 ---
 
 ## Description

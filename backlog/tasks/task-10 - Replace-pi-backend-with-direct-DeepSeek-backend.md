@@ -5,14 +5,14 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-03 14:44'
-updated_date: '2026-07-03 15:26'
+updated_date: '2026-07-05 14:31'
 labels:
   - backend
   - ai
   - deepseek
 dependencies: []
 priority: high
-ordinal: 500
+ordinal: 17000
 ---
 
 ## Description

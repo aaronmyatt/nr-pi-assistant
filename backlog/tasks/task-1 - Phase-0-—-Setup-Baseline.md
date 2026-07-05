@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:00'
-updated_date: '2026-07-01 14:27'
+updated_date: '2026-07-05 14:31'
 labels:
   - phase-0
   - setup
@@ -15,7 +15,7 @@ references:
   - 'https://github.com/FlowFuse/nr-assistant'
   - 'https://github.com/earendil-works/pi'
 priority: high
-ordinal: 1000
+ordinal: 18000
 ---
 
 ## Description

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:01'
-updated_date: '2026-07-01 15:32'
+updated_date: '2026-07-05 14:31'
 labels:
   - phase-3
   - autocomplete
@@ -15,7 +15,7 @@ milestone: m-0
 dependencies:
   - TASK-2
 priority: high
-ordinal: 4000
+ordinal: 21000
 ---
 
 ## Description

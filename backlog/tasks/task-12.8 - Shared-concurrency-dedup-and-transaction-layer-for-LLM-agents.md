@@ -1,9 +1,10 @@
 ---
 id: TASK-12.8
 title: 'Shared concurrency, dedup, and transaction layer for LLM agents'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-04 13:40'
+updated_date: '2026-07-05 15:47'
 labels:
   - ai
   - editor
@@ -15,7 +16,7 @@ references:
   - commits 3ce3c61 + c8b38d7
 parent_task_id: TASK-12
 priority: high
-ordinal: 20000
+ordinal: 1000
 ---
 
 ## Description

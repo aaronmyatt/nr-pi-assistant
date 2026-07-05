@@ -1,10 +1,10 @@
 ---
 id: TASK-12.6
 title: Render guidance hints inline as ephemeral comment nodes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-04 13:40'
-updated_date: '2026-07-04 14:30'
+updated_date: '2026-07-05 14:31'
 labels:
   - editor
   - ux
@@ -15,7 +15,7 @@ references:
   - resources/hintsSidebar.js
 parent_task_id: TASK-12
 priority: high
-ordinal: 18000
+ordinal: 16000
 ---
 
 ## Description

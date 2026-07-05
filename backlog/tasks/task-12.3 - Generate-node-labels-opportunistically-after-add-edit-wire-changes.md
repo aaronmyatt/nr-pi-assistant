@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-03 15:36'
-updated_date: '2026-07-04 14:27'
+updated_date: '2026-07-05 14:10'
 labels:
   - ai
   - editor
@@ -18,7 +18,7 @@ references:
   - resources/expertAutomations.js
 parent_task_id: TASK-12
 priority: high
-ordinal: 125
+ordinal: 15000
 ---
 
 ## Description

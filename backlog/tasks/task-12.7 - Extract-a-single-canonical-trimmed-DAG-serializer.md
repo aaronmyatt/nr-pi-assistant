@@ -1,9 +1,10 @@
 ---
 id: TASK-12.7
 title: Extract a single canonical trimmed-DAG serializer
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-04 13:40'
+updated_date: '2026-07-05 14:31'
 labels:
   - ai
   - editor
@@ -15,7 +16,7 @@ references:
   - resources/nodeContext.js
 parent_task_id: TASK-12
 priority: high
-ordinal: 19000
+ordinal: 31.25
 ---
 
 ## Description
