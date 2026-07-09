@@ -450,55 +450,6 @@ describeMain('AssistantHintsSidebar', function () {
 
     // ── _requestAIHints (without jQuery / with AI disabled) ───────────────
 
-    it('should not request AI hints when assistantOptions.enabled is false', function () {
-        sidebar.init({ RED, assistantOptions: { enabled: false } })
-        sidebar._getFlowName = () => 'test flow'
-
-        const node = { id: 'n1', type: 'function', wires: [], func: 'return msg;' }
-        const nodeContext = { type: 'function', helpSummary: 'Runs code.', inputs: 1, outputs: 1 }
-
-        // Should not add to fetching set since enabled is false
-        sidebar._requestAIHints(node, nodeContext)
-        sidebar._aiHintsFetching.has('n1').should.be.false()
-    })
-
-    it('should cache AI hints and not re-request for same fingerprint', function () {
-        sidebar.init({ RED, assistantOptions: { enabled: true } })
-        sidebar._getFlowName = () => 'test flow'
-
-        const node = { id: 'n1', type: 'function', wires: [], func: 'return msg;' }
-        const nodeContext = { type: 'function', helpSummary: 'Runs code.', inputs: 1, outputs: 1 }
-
-        // Manually populate the cache
-        const fp = fingerprintNode({ node, upstream: [], downstream: [] })
-        sidebar._aiHintsCache.set('n1', { fingerprint: fp, hints: ['Cached hint 1'], timestamp: Date.now() })
-
-        // Mock inject so we can verify it was called
-        let injectCalled = false
-        sidebar._injectAIHints = function (hints) {
-            injectCalled = true
-            hints.should.deepEqual(['Cached hint 1'])
-        }
-
-        sidebar._requestAIHints(node, nodeContext)
-        injectCalled.should.be.true()
-        // Should not have added to fetching (cache hit)
-        sidebar._aiHintsFetching.has('n1').should.be.false()
-    })
-
-    it('should respect the max attempts cap', function () {
-        sidebar.init({ RED, assistantOptions: { enabled: true } })
-        sidebar._getFlowName = () => 'test flow'
-        sidebar._aiHintsAttempts.set('n1', 3) // MAX_AI_HINT_ATTEMPTS
-
-        const node = { id: 'n1', type: 'function', wires: [], func: 'return msg;' }
-        const nodeContext = { type: 'function', helpSummary: 'Runs code.', inputs: 1, outputs: 1 }
-
-        sidebar._requestAIHints(node, nodeContext)
-        // Should not add to fetching set since attempts exhausted
-        sidebar._aiHintsFetching.has('n1').should.be.false()
-    })
-
     // ── _injectAIHints / _injectAIHintsError ───────────────────────────
 
     it('should inject AI hints into the panel without throwing', function () {

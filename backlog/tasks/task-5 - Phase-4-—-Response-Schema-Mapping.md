@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:01'
-updated_date: '2026-07-05 14:31'
+updated_date: '2026-07-07 15:38'
 labels:
   - phase-4
   - integration
@@ -16,7 +16,7 @@ dependencies:
 references:
   - Migration plan §6.1 — Response data shapes
 priority: high
-ordinal: 22000
+ordinal: 24000
 ---
 
 ## Description

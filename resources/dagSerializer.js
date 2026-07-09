@@ -36,9 +36,13 @@
  * Stripped: position (x/y/z), internal ids (_def, _alias, _flow), wiring
  *   (wires), presentation metadata (g, l, d, inputs, outputs, disabled).
  */
+// Node-RED adds transient runtime properties ('changed', 'dirty') that flip
+// during editing — they must be excluded from fingerprints or the cache
+// will never hit. Ref: https://nodered.org/docs/api/ui/editableList/
 export const CRUFT_KEYS = new Set([
     'id', 'type', 'name', 'x', 'y', 'z', 'wires', 'd', 'g', 'l',
-    'inputs', 'outputs', '_def', '_alias', '_flow', 'disabled'
+    'inputs', 'outputs', 'changed', 'dirty',
+    '_def', '_alias', '_flow', 'disabled'
 ])
 
 /** @type {number} Max config string length before truncation. */

@@ -42,8 +42,6 @@ const SHOW_ACTION_ID = 'flowfuse-nr-assistant:show-hints'
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-/** @type {number} Max attempts per node per session for AI hint requests. */
-const MAX_AI_HINT_ATTEMPTS = 3
 
 /** @type {number} Timeout for each individual AI hint AJAX request. */
 const AI_HINT_TIMEOUT_MS = 20000
@@ -75,20 +73,11 @@ export class AssistantHintsSidebar {
     _maxRetries = 8
 
     // ── AI hint tracking ─────────────────────────────────────────────────
-    // Deprecated in favour of AgentScheduler. Kept as null placeholders
-    // for compatibility during migration. Remove after TASK-12.8.
+    // All dedup, caching, and attempt-cap logic is delegated to the shared
+    // AgentScheduler (TASK-12.8). No in-class state beyond the scheduler ref.
 
     /** @type {AgentScheduler|null} */
     _scheduler = null
-
-    /** @type {Map} @deprecated — legacy fallback when no scheduler */
-    _aiHintsCache = new Map()
-
-    /** @type {Set} @deprecated */
-    _aiHintsFetching = new Set()
-
-    /** @type {Map} @deprecated */
-    _aiHintsAttempts = new Map()
 
     // ── Public API ──────────────────────────────────────────────────────────
 
@@ -505,10 +494,9 @@ export class AssistantHintsSidebar {
 
         this._lastRequestedNode = node
 
-        // If no scheduler, fall back to old in-class dedup (backward compat).
-        if (!this._scheduler) {
-            return this._requestAIHintsLegacy(node, nodeContext)
-        }
+        // Defensive: production always supplies a scheduler (index.html),
+        // but tests may call refreshFromSelection without one.
+        if (!this._scheduler) return
 
         const { upstream, downstream } = this._getConnectedNodes(node)
 
@@ -574,13 +562,13 @@ export class AssistantHintsSidebar {
 
                 if (!Array.isArray(hints) || hints.length === 0) {
                     // Cache the empty result so we don't keep re-requesting.
-                    this._scheduler.commit('hint', nodeId, [], { node, upstream, downstream })
+                    this._scheduler.commit('hint', nodeId, [], { node, upstream, downstream, fingerprint: permit.fingerprint })
                     this._injectAIHints([])
                     this._emitHintsReady(node, [])
                     return
                 }
 
-                this._scheduler.commit('hint', nodeId, hints, { node, upstream, downstream })
+                this._scheduler.commit('hint', nodeId, hints, { node, upstream, downstream, fingerprint: permit.fingerprint })
 
                 console.log('[nr-assistant:hints] AI hints received (scheduler)', {
                     nodeId,
@@ -597,68 +585,6 @@ export class AssistantHintsSidebar {
                     textStatus,
                     errorThrown: errorThrown?.message || String(errorThrown)
                 })
-                this._injectAIHintsError()
-            }
-        })
-    }
-
-    /**
-     * Legacy fallback when no AgentScheduler is provided (backward compat).
-     *
-     * @param {Object} node
-     * @param {Object} nodeContext
-     * @returns {void}
-     */
-    _requestAIHintsLegacy (node, nodeContext) {
-        const nodeId = node.id
-
-        const fingerprint = fingerprintNode({ node, upstream: this._getConnectedNodes(node).upstream, downstream: this._getConnectedNodes(node).downstream })
-        const cached = this._aiHintsCache.get(nodeId)
-        if (cached && cached.fingerprint === fingerprint) {
-            console.log('[nr-assistant:hints] AI hints cache hit (legacy)', { nodeId })
-            this._injectAIHints(cached.hints)
-            this._emitHintsReady(node, cached.hints)
-            return
-        }
-
-        if (this._aiHintsFetching.has(nodeId)) return
-
-        const attempts = this._aiHintsAttempts.get(nodeId) || 0
-        if (attempts >= 3) return
-
-        const prompt = this._buildHintPrompt(node, nodeContext)
-        if (!prompt || prompt.length < 20) return
-
-        if (typeof globalThis.$ === 'undefined' || typeof globalThis.$.ajax !== 'function') return
-        if (!this.assistantOptions?.enabled) return
-
-        this._aiHintsFetching.add(nodeId)
-        this._aiHintsAttempts.set(nodeId, attempts + 1)
-
-        const transactionId = `hint-${nodeId}-${Date.now()}`
-
-        globalThis.$.ajax({
-            url: 'nr-assistant/hint',
-            type: 'POST',
-            data: JSON.stringify({ prompt, transactionId, context: { type: node.type, scope: 'hint', nodeContext: toPromptNodeContext(nodeContext) } }),
-            contentType: 'application/json',
-            timeout: AI_HINT_TIMEOUT_MS,
-            success: (reply) => {
-                this._aiHintsFetching.delete(nodeId)
-                const hintData = reply?.data?.data || reply?.data
-                const hints = hintData?.hints
-                if (!Array.isArray(hints) || hints.length === 0) {
-                    this._aiHintsCache.set(nodeId, { fingerprint, hints: [], timestamp: Date.now() })
-                    this._injectAIHints([])
-                    this._emitHintsReady(node, [])
-                    return
-                }
-                this._aiHintsCache.set(nodeId, { fingerprint, hints, timestamp: Date.now() })
-                this._injectAIHints(hints)
-                this._emitHintsReady(node, hints)
-            },
-            error: (jqXHR, textStatus, errorThrown) => {
-                this._aiHintsFetching.delete(nodeId)
                 this._injectAIHintsError()
             }
         })

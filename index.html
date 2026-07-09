@@ -45,6 +45,7 @@
     import { ExpertComms } from './resources/node-red-contrib-pi-assistant/expertComms.js'
     import { AssistantHintsSidebar } from './resources/node-red-contrib-pi-assistant/hintsSidebar.js'
     import { InlineAnnotations } from './resources/node-red-contrib-pi-assistant/inlineAnnotations.js'
+    import { NextNodeAgent } from './resources/node-red-contrib-pi-assistant/nextNodeAgent.js'
     import { AgentScheduler } from './resources/node-red-contrib-pi-assistant/agentScheduler.js'
     import { getNodeInstanceContext, toPromptNodeContext } from './resources/node-red-contrib-pi-assistant/nodeContext.js'
 
@@ -106,6 +107,8 @@
         let hintsSidebar = null
         /** @type {InlineAnnotations|null} */
         let inlineAnnotations = null
+        /** @type {NextNodeAgent|null} */
+        let nextNodeAgent = null
         debug('Loading Node-RED Assistant Plugin...')
 
         function nls (key) {
@@ -276,9 +279,17 @@
                 // and fingerprint-keyed caching across all LLM agents.
                 const scheduler = new AgentScheduler()
                 scheduler.register('hint', { maxAttempts: 3 })
+                scheduler.register('next-node', { maxAttempts: 3 })
 
                 hintsSidebar = new AssistantHintsSidebar()
                 hintsSidebar.init({ RED, assistantOptions, scheduler })
+
+                // Next-node agent (TASK-12.9) — LLM-powered recommendations
+                // for what to wire downstream of the selected node. Heuristic
+                // tier-0 in completions.html fires instantly; this layers on
+                // as tier-1 through the shared scheduler.
+                nextNodeAgent = new NextNodeAgent()
+                nextNodeAgent.init({ RED, assistantOptions, scheduler })
 
                 // Inline annotations render AI hints as ephemeral comment nodes
                 // directly on the canvas (TASK-12.6). It subscribes to the

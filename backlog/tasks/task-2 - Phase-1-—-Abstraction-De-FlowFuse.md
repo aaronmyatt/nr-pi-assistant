@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:01'
-updated_date: '2026-07-05 14:31'
+updated_date: '2026-07-07 15:38'
 labels:
   - phase-1
   - refactor
@@ -14,7 +14,7 @@ milestone: m-0
 dependencies:
   - TASK-1
 priority: high
-ordinal: 19000
+ordinal: 21000
 ---
 
 ## Description

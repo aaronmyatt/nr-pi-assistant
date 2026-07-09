@@ -1,9 +1,10 @@
 ---
 id: TASK-12.9
 title: Next-node recommendation agent (LLM)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-04 13:44'
+updated_date: '2026-07-07 15:38'
 labels:
   - ai
   - editor
@@ -16,7 +17,7 @@ references:
   - lib/assistant.js (predict_next heuristic tool)
 parent_task_id: TASK-12
 priority: high
-ordinal: 21000
+ordinal: 31.25
 ---
 
 ## Description
@@ -38,11 +39,11 @@ If tool-calling (TASK-12.11) has landed, this agent is the primary consumer of t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A dedicated agent returns next-node suggestions only (no config or general advice mixed in)
-- [ ] #2 Existing heuristic next-node predictions still fire instantly as a tier-0 fallback
-- [ ] #3 Suggestions are rendered via the inline annotation surface from TASK-12.6
-- [ ] #4 Requests go through the shared scheduler (TASK-12.8) — no per-agent dedup code
-- [ ] #5 Tests cover prompt building, response parsing, and the heuristic+LLM tiering
+- [x] #1 A dedicated agent returns next-node suggestions only (no config or general advice mixed in)
+- [x] #2 Existing heuristic next-node predictions still fire instantly as a tier-0 fallback
+- [x] #3 Suggestions are rendered via the inline annotation surface from TASK-12.6
+- [x] #4 Requests go through the shared scheduler (TASK-12.8) — no per-agent dedup code
+- [x] #5 Tests cover prompt building, response parsing, and the heuristic+LLM tiering
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,3 +51,9 @@ If tool-calling (TASK-12.11) has landed, this agent is the primary consumer of t
 <!-- SECTION:PLAN:BEGIN -->
 4. Tests + manual verification (cache clear + restart).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Created lib/ai/prompts/next-node.md (system prompt), resources/nextNodeAgent.js (browser agent with scheduler integration, selection-change + links:add triggers), updated inlineAnnotations.js (renderNextNode), wired index.html. 19 new tests covering init, dedup, cache, prompt building, response parsing (JSON/string/extraction), connected nodes, event emission, and links:add trigger. Full suite: 542 pass (+19).
+<!-- SECTION:NOTES:END -->

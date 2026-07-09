@@ -106,6 +106,14 @@ class Permit {
 
     /** @type {string} Reason for denial (for logging). */
     reason = ''
+
+    /**
+     * The fingerprint computed at acquire time. Stored so commit can
+     * cache against the *same* fingerprint without re-reading the node
+     * (which Node-RED may have mutated during the async AJAX call).
+     * @type {string|null}
+     */
+    fingerprint = null
 }
 
 // ── AgentScheduler ──────────────────────────────────────────────────────────
@@ -214,6 +222,7 @@ export class AgentScheduler {
         agent.attempts.set(nodeId, attempts + 1)
         permit.allowed = true
         permit.transactionId = `${agentName}-${nodeId}-${Date.now()}`
+        permit.fingerprint = fp
 
         console.log(`[nr-assistant:scheduler] ${agentName} acquire`, {
             nodeId,
@@ -236,19 +245,23 @@ export class AgentScheduler {
      * @param {Object[]} [params.upstream=[]] - For fingerprint on commit.
      * @param {Object[]} [params.downstream=[]] - For fingerprint on commit.
      * @param {Object} [params.node] - Node reference for fingerprint.
+     * @param {string} [params.fingerprint] - Pre-computed fingerprint from
+     *   acquire. Preferred over re-fingerprinting to avoid transient-property
+     *   drift during async requests.
      * @returns {void}
      */
-    commit (agentName, nodeId, result, { upstream = [], downstream = [], node = null } = {}) {
+    commit (agentName, nodeId, result, { upstream = [], downstream = [], node = null, fingerprint = null } = {}) {
         const agent = this._agents.get(agentName)
         if (!agent) return
 
         agent.inflight.delete(nodeId)
 
-        // Re-fingerprint on commit so the cache key matches the state at
-        // response time (the node may have changed during the request).
-        const fp = node
+        // Prefer the acquire-time fingerprint (avoids issues with Node-RED
+        // mutating transient properties on the node during the async AJAX).
+        // Fall back to re-fingerprinting only when no pre-computed fp given.
+        const fp = fingerprint || (node
             ? fingerprintNode({ node, upstream, downstream })
-            : Date.now().toString() // fallback — caller should pass node
+            : Date.now().toString())
 
         agent.cache.set(nodeId, { fingerprint: fp, result, timestamp: Date.now() })
         console.log(`[nr-assistant:scheduler] ${agentName} commit`, { nodeId, fingerprint: fp.slice(0, 40) })

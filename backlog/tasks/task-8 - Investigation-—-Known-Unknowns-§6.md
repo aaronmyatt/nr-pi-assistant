@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:02'
-updated_date: '2026-07-05 14:31'
+updated_date: '2026-07-07 15:38'
 labels:
   - investigation
   - discovery
@@ -15,7 +15,7 @@ dependencies:
 references:
   - Migration plan §6 — Known unknowns
 priority: high
-ordinal: 25000
+ordinal: 27000
 ---
 
 ## Description

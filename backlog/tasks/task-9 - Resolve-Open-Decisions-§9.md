@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:02'
-updated_date: '2026-07-05 14:31'
+updated_date: '2026-07-07 15:38'
 labels:
   - decisions
   - blocker
@@ -13,7 +13,7 @@ milestone: m-0
 dependencies:
   - TASK-8
 priority: high
-ordinal: 26000
+ordinal: 28000
 ---
 
 ## Description

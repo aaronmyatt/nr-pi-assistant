@@ -206,8 +206,20 @@ describe('DeepSeekBackend', function () {
     })
 
     it('should require an API key', function () {
-        (() => {
-            return new DeepSeekBackend({ got: fakeGot, RED })
-        }).should.throw(/DEEPSEEK_API_KEY/)
+        // The constructor falls back to process.env.DEEPSEEK_API_KEY when no
+        // options.apiKey is passed. Stash any env key so this test runs
+        // deterministically regardless of the runtime environment.
+        const savedKey = process.env.DEEPSEEK_API_KEY
+        delete process.env.DEEPSEEK_API_KEY
+        try {
+            (() => {
+                return new DeepSeekBackend({ got: fakeGot, RED })
+            }).should.throw(/DEEPSEEK_API_KEY/)
+        } finally {
+            // Restore the env key so other tests (and real requests) keep working.
+            if (savedKey !== undefined) {
+                process.env.DEEPSEEK_API_KEY = savedKey
+            }
+        }
     })
 })

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@aaronmyatt'
 created_date: '2026-07-01 14:01'
-updated_date: '2026-07-05 14:31'
+updated_date: '2026-07-07 15:38'
 labels:
   - phase-2
   - pi
@@ -16,7 +16,7 @@ milestone: m-0
 dependencies:
   - TASK-2
 priority: high
-ordinal: 20000
+ordinal: 22000
 ---
 
 ## Description
